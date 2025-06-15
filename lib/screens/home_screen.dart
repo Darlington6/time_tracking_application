@@ -15,11 +15,16 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isHoveringAllEntries = false;
+  bool _isHoveringGroupedProjects = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // Rebuild when tab changes
+    });
   }
 
   @override
@@ -36,6 +41,46 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
     return map;
   }
 
+  Widget _buildCustomTab({
+    required String label,
+    required int index,
+    required bool isHovering,
+    required void Function(bool) onHoverChanged,
+  }) {
+    final isSelected = _tabController.index == index;
+
+    return MouseRegion(
+      onEnter: (_) => onHoverChanged(true),
+      onExit: (_) => onHoverChanged(false),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _tabController.index = index;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isHovering || isSelected ? Colors.orange : Colors.transparent,
+                width: 3,
+              ),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isHovering || isSelected ? Colors.white : const Color.fromRGBO(51, 51, 51, 0.7),
+              fontWeight: FontWeight.w500,
+              fontSize: 16,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -43,14 +88,27 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
       child: Scaffold(
         appBar: AppBar(
           centerTitle: true,
-          title: Text('Time Tracking', style: TextStyle(color: Colors.white)),
+          title: const Text('Time Tracking', style: TextStyle(color: Colors.white)),
           backgroundColor: Colors.teal,
-          bottom: TabBar(
-            controller: _tabController,
-            tabs: [
-              Tab(text: 'All Entries'),
-              Tab(text: 'Grouped by Projects'),
-            ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(48),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildCustomTab(
+                  label: 'All Entries',
+                  index: 0,
+                  isHovering: _isHoveringAllEntries,
+                  onHoverChanged: (hovering) => setState(() => _isHoveringAllEntries = hovering),
+                ),
+                _buildCustomTab(
+                  label: 'Grouped by Projects',
+                  index: 1,
+                  isHovering: _isHoveringGroupedProjects,
+                  onHoverChanged: (hovering) => setState(() => _isHoveringGroupedProjects = hovering),
+                ),
+              ],
+            ),
           ),
         ),
         drawer: Drawer(
@@ -58,32 +116,26 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               DrawerHeader(
-                decoration: BoxDecoration(color: Colors.teal),
-                child: SizedBox(
+                decoration: const BoxDecoration(color: Colors.teal),
+                child: const SizedBox(
                   width: double.infinity,
-                  child: Text('Menu', style: TextStyle(fontSize: 24, color: Colors.white), textAlign: TextAlign.center,),
-                  ),
+                  child: Text('Menu', style: TextStyle(fontSize: 24, color: Colors.white), textAlign: TextAlign.center),
+                ),
               ),
               ListTile(
-                leading: Icon(Icons.folder),
-                title: Text('Projects'),
+                leading: const Icon(Icons.folder),
+                title: const Text('Projects'),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => ProjectManagementScreen()),
-                  );
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => ProjectManagementScreen()));
                 },
               ),
               ListTile(
-                leading: Icon(Icons.assignment),
-                title: Text('Tasks'),
+                leading: const Icon(Icons.assignment),
+                title: const Text('Tasks'),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => TaskManagementScreen()),
-                  );
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => TaskManagementScreen()));
                 },
               ),
             ],
@@ -96,50 +148,30 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
 
             return TabBarView(
               controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(), // Prevent swipe, tab changes via custom tabs only
               children: [
-                // Tab 1: All Entries
                 entries.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.hourglass_empty, size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text(
-                              'No time entries yet!',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            SizedBox(height: 8),
-                            Text('Tap the + button to add your first entry.'),
-                          ],
-                        ),
-                      )
+                    ? _buildEmptyState()
                     : ListView.builder(
                         itemCount: entries.length,
                         itemBuilder: (context, index) {
                           final entry = entries[index];
                           return Card(
-                            margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             elevation: 2,
                             child: ListTile(
                               title: Text('${entry.projectId} - ${entry.totalTime} hours'),
-                              subtitle: Text(
-                                '${entry.date.toLocal().toString().split(' ')[0]} - Notes: ${entry.notes}',
-                              ),
+                              subtitle: Text('${entry.date.toLocal().toString().split(' ')[0]} - Notes: ${entry.notes}'),
                               trailing: IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(Icons.delete, color: Colors.red),
                                 onPressed: () => provider.deleteTimeEntry(entry.id),
                               ),
                             ),
                           );
                         },
                       ),
-
-                // Tab 2: Grouped by Projects
                 grouped.isEmpty
-                    ? Center(
-                        child: Text('No entries to group by project yet.'),
-                      )
+                    ? _buildEmptyState()
                     : ListView(
                         children: grouped.entries.map((group) {
                           return ExpansionTile(
@@ -147,11 +179,9 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                             children: group.value.map((entry) {
                               return ListTile(
                                 title: Text('${entry.taskId} - ${entry.totalTime} hours'),
-                                subtitle: Text(
-                                  '${entry.date.toLocal().toString().split(' ')[0]} - Notes: ${entry.notes}',
-                                ),
+                                subtitle: Text('${entry.date.toLocal().toString().split(' ')[0]} - Notes: ${entry.notes}'),
                                 trailing: IconButton(
-                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  icon: const Icon(Icons.delete, color: Colors.red),
                                   onPressed: () => provider.deleteTimeEntry(entry.id),
                                 ),
                               );
@@ -165,14 +195,27 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            Navigator.push(context,
-              MaterialPageRoute(builder: (context) => AddTimeEntryScreen()),
-            );
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const AddTimeEntryScreen()));
           },
           backgroundColor: Colors.orangeAccent,
           tooltip: 'Add Time Entry',
-          child: Icon(Icons.add),
+          child: const Icon(Icons.add, color: Colors.white,),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.hourglass_empty, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('No time entries yet!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text('Tap the + button to add your first entry.'),
+        ],
       ),
     );
   }
