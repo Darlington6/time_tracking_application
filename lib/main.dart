@@ -22,6 +22,7 @@ class TimeTrackerApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Time Tracker',
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.blue,
         ),
