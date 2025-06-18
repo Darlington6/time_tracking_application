@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/time_entry.dart';
+import '../models/project.dart';
+import '../models/task.dart';
 import '../providers/time_entry_provider.dart';
+import '../providers/project_task_provider.dart';
 import 'project_management_screen.dart';
 import 'task_management_screen.dart';
 import 'time_entry_screen.dart';
@@ -23,7 +26,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
-      setState(() {}); // Rebuild when tab changes
+      setState(() {});
     });
   }
 
@@ -39,6 +42,22 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
       map.putIfAbsent(entry.projectId, () => []).add(entry);
     }
     return map;
+  }
+
+  Project? findProjectById(List<Project> projects, String id) {
+    try {
+      return projects.firstWhere((p) => p.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Task? findTaskById(List<Task> tasks, String id) {
+    try {
+      return tasks.firstWhere((t) => t.id == id);
+    } catch (_) {
+      return null;
+    }
   }
 
   Widget _buildCustomTab({
@@ -115,9 +134,9 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DrawerHeader(
-                decoration: const BoxDecoration(color: Colors.teal),
-                child: const SizedBox(
+              const DrawerHeader(
+                decoration: BoxDecoration(color: Colors.teal),
+                child: SizedBox(
                   width: double.infinity,
                   child: Text('Menu', style: TextStyle(fontSize: 24, color: Colors.white), textAlign: TextAlign.center),
                 ),
@@ -141,51 +160,109 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
             ],
           ),
         ),
-        body: Consumer<TimeEntryProvider>(
-          builder: (context, provider, child) {
-            final entries = provider.entries;
+        body: Consumer2<TimeEntryProvider, ProjectTaskProvider>(
+          builder: (context, timeEntryProvider, projectTaskProvider, _) {
+            final entries = timeEntryProvider.entries;
             final grouped = groupEntriesByProject(entries);
 
             return TabBarView(
               controller: _tabController,
-              physics: const NeverScrollableScrollPhysics(), // Prevent swipe, tab changes via custom tabs only
+              physics: const NeverScrollableScrollPhysics(),
               children: [
+                // All Entries
                 entries.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
                         itemCount: entries.length,
                         itemBuilder: (context, index) {
                           final entry = entries[index];
+                          final project = findProjectById(projectTaskProvider.projects, entry.projectId);
+                          final task = findTaskById(projectTaskProvider.tasks, entry.taskId);
+                          final projectName = project?.name ?? 'Unknown Project';
+                          final taskName = task?.name ?? 'Unknown Task';
+
                           return Card(
                             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            elevation: 2,
+                            elevation: 4,
                             child: ListTile(
-                              title: Text('${entry.projectId} - ${entry.totalTime} hours'),
-                              subtitle: Text('${entry.date.toLocal().toString().split(' ')[0]} - Notes: ${entry.notes}'),
+                              title: Text(
+                                '$projectName - $taskName',
+                                style: const TextStyle(
+                                  color: Colors.teal,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Total Time: ${entry.totalTime} hours'),
+                                  Text('Date: ${_formatDate(entry.date)}'),
+                                  Text('Notes: ${entry.notes}'),
+                                ],
+                              ),
+                              isThreeLine: true,
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => provider.deleteTimeEntry(entry.id),
+                                onPressed: () => timeEntryProvider.deleteTimeEntry(entry.id),
                               ),
                             ),
                           );
                         },
                       ),
+                // Grouped by Projects
                 grouped.isEmpty
                     ? _buildEmptyState()
                     : ListView(
                         children: grouped.entries.map((group) {
-                          return ExpansionTile(
-                            title: Text(group.key),
-                            children: group.value.map((entry) {
-                              return ListTile(
-                                title: Text('${entry.taskId} - ${entry.totalTime} hours'),
-                                subtitle: Text('${entry.date.toLocal().toString().split(' ')[0]} - Notes: ${entry.notes}'),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => provider.deleteTimeEntry(entry.id),
-                                ),
-                              );
-                            }).toList(),
+                          final project = findProjectById(projectTaskProvider.projects, group.key);
+                          final projectName = project?.name ?? 'Unknown Project';
+                          final entries = group.value;
+
+                          return Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            elevation: 4,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    projectName,
+                                    style: const TextStyle(
+                                      color: Colors.teal,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...entries.map((entry) {
+                                    final task = findTaskById(projectTaskProvider.tasks, entry.taskId);
+                                    final taskName = task?.name ?? 'Unknown Task';
+                                    final formattedDate = _formatDate(entry.date);
+
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              '- $taskName: ${entry.totalTime} hours ($formattedDate)',
+                                              style: const TextStyle(fontSize: 14),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, color: Colors.red),
+                                            onPressed: () => timeEntryProvider.deleteTimeEntry(entry.id),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
                           );
                         }).toList(),
                       ),
@@ -199,7 +276,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
           },
           backgroundColor: Colors.orangeAccent,
           tooltip: 'Add Time Entry',
-          child: const Icon(Icons.add, color: Colors.white,),
+          child: const Icon(Icons.add, color: Colors.white),
         ),
       ),
     );
@@ -218,5 +295,13 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[date.month]} ${date.day}, ${date.year}';
   }
 }

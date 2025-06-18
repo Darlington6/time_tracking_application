@@ -111,7 +111,7 @@ class _AddTimeEntryScreenState extends State<AddTimeEntryScreen> {
               ],
 
               // Always-visible form fields
-              Text('Date: ${date.toLocal().toString().split(' ')[0]}'),
+              Text('Date: ${date.toLocal().toString().split(' ')[0]}', style: TextStyle(fontWeight: FontWeight.bold),),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -121,7 +121,7 @@ class _AddTimeEntryScreenState extends State<AddTimeEntryScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       foregroundColor: Colors.blue, // Text color
                     ),
-                    child: const Text('Select Date'),
+                    child: const Text('Select Date',),
                   ),
                 ],
               ),
@@ -160,7 +160,6 @@ class _AddTimeEntryScreenState extends State<AddTimeEntryScreen> {
                   focusedBorder: UnderlineInputBorder(
                     borderSide: BorderSide(color: Colors.blue, width: 1), // When focused
                   ),
-                  // border: OutlineInputBorder(),
                 ),
                 maxLines: 1,
                 onSaved: (val) => notes = val ?? '',
